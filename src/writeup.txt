@@ -1,0 +1,7 @@
+1. How might rosbag fit into a debugging process as you work on projects in this class?
+
+Rosbag's ability to replay the messages in a system allow for the ROS equivalent of stepping through your code - replicating the state of the system in order to discover what caused various behaviors in the robot.
+
+Are there any obvious shortcomings of rosbag as a debugging tool?
+
+File sizes from camera images/video are enormous, and it sounds like it might clobber the network too.
