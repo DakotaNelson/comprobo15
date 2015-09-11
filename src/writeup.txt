@@ -9,3 +9,9 @@ File sizes from camera images/video are enormous, and it sounds like it might cl
 3. Using TF in rviz
 
 Using TF in rviz makes sense - moving the coordinate frame to "map" causes the odom axis to follow the robot as it moves, while keeping the frame in "odom" causes the transform axes to move with the robot.
+
+4. Listener.py now sleeps
+
+When listener.py wakes up, it processes the backlog of messages in one sudden spurt. This could cause problems if sensors are hung up on old data while newer data is available (which is slowly becoming stale).
+
+In the case where listener.py has a queue size, it throws out old data, which can be bad if you absolutely have to have everything, but good if old data is useless to you. (i.e. sensor data from a minute ago... generally not useful, no sense wasting our time processing it and letting actually useful new data decay)
