@@ -16,20 +16,18 @@ class Avoid(object):
         rospy.Subscriber('scan', LaserScan, self.callback, queue_size=1)
         self.cmdpub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         self.goalpub = rospy.Publisher('/vector_field', MarkerArray, queue_size=10)
-        self.tf = TransformListener()
-        self.totxerr = 0
-        self.totyerr = 0
-        self.kpx = .2
-        self.kpy = 1
-        self.kix = .005
-        self.kiy = .005
+        self.headingpub = rospy.Publisher('/ideal_heading', Marker, queue_size=10)
+        #self.tf = TransformListener()
+        self.toterr = 0
+        self.kp = 1
+        self.ki = .005
+        self.numVectors = 0
 
     def callback(self, msg):
         #scan = np.array(msg.ranges[:45]+msg.ranges[361-45:])
         scan = np.array(msg.ranges)
         angles = [msg.angle_min + (i*msg.angle_increment) for i in range(len(msg.ranges))]
         angles = np.array(angles)
-        #angles = np.array(angles[:45]+angles[361-45:])
 
         # replace zeros with nans
         scan[scan == 0] = np.nan
@@ -40,42 +38,98 @@ class Avoid(object):
 
         vectors = []
         for i in range(len(xpoints)):
-            # build a bunch of vectors pointing from obstacles to us (we're at 0,0)
-            vector = np.array([-xpoints[i], -ypoints[i]])
-            #length = np.linalg.norm(vector)
-            # things that are farther are lower priority
-            #vector = np.divide(scan[i])
             if not np.isnan(xpoints[i]) and not np.isnan(ypoints[i]):
-                vectors.append(vector)
+                if xpoints[i] <= 0:
+                    # the obstacle is in front of us
+                    # build a bunch of vectors pointing from obstacles to us (we're at 0,0)
+                    # since all start at (0,0), the "-xpoints[i]" is implicitly "0-xpoints[i]"
+                    vector = np.array([-xpoints[i], -ypoints[i]])
+                    #length = np.linalg.norm(vector)
+                    # things that are farther are lower priority
+                    inverse_weight = scan[i]**2
+                    vector = np.divide(vector, inverse_weight)
+                    vectors.append(vector)
 
         self.displayVectors(vectors)
 
-        """xerr = xmass
-        yerr = ymass
-        self.totxerr += xerr
-        self.totyerr += yerr
+        ideal = np.array([3,0]) # we'd like to go straight ahead
+        # pretty badly, too
+
+        avoidance = np.sum(vectors,0)
+        avoidance_length = np.linalg.norm(avoidance)
+        avoidance = np.divide(avoidance, avoidance_length)
+        '''if avoidance_length > 2:
+            # avoidance_length is /2 to allow it to be double that of ideal_length
+            # this means the obstacle avoidance (at most) is 2x as powerful as the goal
+            avoidance = np.divide(avoidance, avoidance_length/2)'''
+
+        goal = np.subtract(ideal, avoidance) # stay away from obstacles
+        goal_length = np.linalg.norm(goal) # normalize
+        goal = np.divide(goal, goal_length)
+        self.displayVector(goal)
+
+        # desired heading
+        theta = np.arctan2(goal[1], goal[0])
+        if np.isnan(theta): theta = 0
+        # arctan(x/y) translated to ROS coords
 
         # simple PI controller
-        xcmdval = ((xerr * self.kpx) + (self.totxerr * self.kix))
-        ycmdval = ((yerr * self.kpy) + (self.totyerr * self.kiy))
+        cmdval = ((theta * self.kp) + (self.toterr * self.ki))
+        if cmdval > 1: cmdval = 1
+        print(cmdval)
+        self.toterr += theta
 
-        twister = Twist(linear=Vector3(x=xcmdval,y=0,z=0),angular=Vector3(x=0,y=0,z=ycmdval))
-        #self.cmdpub.publish(twister)"""
+        twister = Twist(linear=Vector3(x=0.2,y=0,z=0),angular=Vector3(x=0,y=0,z=cmdval))
+        self.cmdpub.publish(twister)
         return
+
+    def displayVector(self, vector):
+        start_msg = Point(x=0, y=0, z=0.0)
+        end_msg = Point(x=vector[0], y=vector[1], z=0)
+        header_msg = Header(stamp=rospy.Time.now(),
+                                    frame_id="base_link")
+        marker = Marker(header = header_msg,
+                     ns = "test_ns",
+                     id = 1,
+                     type = Marker.ARROW,
+                     action = Marker.ADD,
+                     points=[start_msg, end_msg])
+
+        marker.scale.x = .02
+        marker.scale.y = .02
+        marker.scale.z = .02
+
+        marker.color.r = 0.0
+        marker.color.g = 0.0
+        marker.color.b = 1.0
+        marker.color.a = 1.0
+
+        self.headingpub.publish(marker)
 
     def displayVectors(self, vectors):
         marker_field = []
-        counter = 0
-        for vector in vectors:
+        length = max(len(vectors), self.numVectors)
+        if length > self.numVectors:
+            self.numVectors = length
+
+        for i in range(length):
+            if i >= len(vectors):
+                vector = np.array([0,0])
+                action = Marker.DELETE
+            else:
+                vector = vectors[i]
+                action = Marker.ADD
+
             start_msg = Point(x=vector[0], y=vector[1], z=0.0)
             end_msg = Point(x=0, y=0, z=0)
+
             header_msg = Header(stamp=rospy.Time.now(),
                                         frame_id="base_link")
             marker = Marker(header = header_msg,
                          ns = "test_ns",
-                         id = counter,
+                         id = i,
                          type = Marker.ARROW,
-                         action = Marker.ADD,
+                         action = action,
                          points=[start_msg, end_msg])
 
             marker.scale.x = .02
@@ -86,8 +140,6 @@ class Avoid(object):
             marker.color.g = 0.0
             marker.color.b = 0.0
             marker.color.a = 1.0
-
-            counter += 1
 
             marker_field.append(marker)
 
