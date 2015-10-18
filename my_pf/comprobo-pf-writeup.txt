@@ -1,0 +1,11 @@
+1. Our project's goal was to localize the robot using a large number of "guesses" (particles) which were then evaluated for their likelihood using sensor data and resampled based on that likelihood.
+
+2. We first initialized a field of particles in a circle around our initial position estimate. When sensor data came in, the particles were each evaluated based on how well their "scan data" (which was determined using the position of the particle in the map and "faking" scan data to match) matched with our actual scan data. These newly-weighted particles were then resampled. Conversely, when the robot moved, all of the particles moved to match (with some added noise).
+
+3. We had to make a design decision in how to allocate our initial particle field. We started with a uniform circular distribution around the robot, but found that a gaussian density distribution (fewer particles farther away from the initial guess) provided better performance... given the accuracy of our initial guess. With different accuracy, that decision could have been wrong, but it worked under our parameter regime.
+
+4. We had a huge number of bugs... none of which threw errors. Logical bugs (using the wrong name for self.particles vs. self.particle_cloud, for example) threw no errors and caused very subtle and difficult-to-track problems.
+
+5. We would have hunted more bugs and improved efficiency. We could always use more particles, and the localization occasionally failed in ways that suggested subtle and hard-to-fix edge case bugs.
+
+6. We both learned the importance of simulation. Using Gazebo instead of the neatos *vastly* improved our efficiency.
