@@ -1,0 +1,17 @@
+1. I implemented all but the finite-state control.
+
+2. Wall following -> use all of the LIDAR data points to determine deviation from goal, where goal is parallel to the wall, using deviation from desired scan lengths at each angle. (i.e. the 270 degree scan, directly right, should be shortest, and get longer to either side, if we really are parallel)
+
+Person following -> draw a bounding box, find center of mass of particles in box, assumer that's a person and use it as a goal to drive to.
+
+Obstacle avoidance -> gravity surfing all... the... waaaaaaayyyyyyy
+
+3. I didn't actually implement this, but the states would have been something along the lines of following a wall until it's no longer an option (i.e. a corner is found) then turning on obstacle avoidance.
+
+4. All code was structured as classes/objects.
+
+5. Mostly tuning. The basic, first-pass code wasn't cognitively difficult, but getting everything tuned and working out bugs was a long, arduous process. (it's easy to say "yeah, it just looks at the lengths and compares them to the ideal" and harder to work out how to compute the ideal and compare it to reality, especially if you're as bad at trig as I am)
+
+6. More tuning and bugfixing. At a high level, everything was fine, but there were a ton of unhandled edge cases.
+
+7. Bugs bugs bugs tuning bugs bugs tuning bugs test often. (but actually, holy cow, I more-or-less knew physical systems were like that, but it really hit me over the head with this project)
